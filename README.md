@@ -1,15 +1,35 @@
 # Pantryman (Linux / GTK4)
 
-A GTK4 desktop app for managing your pantry and recipes. Built with [Relm4](https://relm4.org/) on top of [Janus Engine](https://github.com/StoppingBuck/janus-engine).
+A cross-platform recipe and pantry manager built for neurodivergents and others who struggle with cooking. This is the GTK4 desktop frontend, built with [Relm4](https://relm4.org/) on top of [Janus Engine](https://github.com/StoppingBuck/janus-engine).
 
-## Features
+***NOTE:** This project makes heavy use of AI in its development. See [AI.md](AI.md) for more information.*
 
-- Browse and edit your ingredient library
-- Track pantry stock (quantities + dates)
-- Browse and plan recipes, filtered by what's in stock
-- Knowledge base with ingredient notes
-- Configurable data directory (defaults to `example/data/` during development)
-- Settings stored in `~/.config/pantryman/user_settings.toml`
+---
+
+## Vision
+
+Pantryman was launched with four ambitions:
+
+1. Made for neurodivergent people and others, who struggle in the kitchen to connect what they **have** (pantry) to what they **can do with it** (recipes).
+2. Privacy by design (PbD) through allowing you to sync (or not) in any way you want.
+3. Unified backend, freedom to frontend: Cram as much of the hard logic into a unified backend, and then have any number of frontends that can make use of it. I'm not an arbiter of fine UX. If you think my app is butt-ugly, you should be free to code a different frontend without having to fork the entire project. Having a strong backend (written in Rust, because of course it is) decoupled gracefully from the UI should make it easier to ensure that every platform has one (or more) app that looks just right for *it*. Alternative frontends are welcome for all platforms.
+4. Maintain a knowledge base with information about ingredients, to engender familiarity with cooking as a (food) science and not just as an incomprehensible art form.
+
+Pantryman is meant for people who relate to the quote "*I hate when I go to the kitchen looking for food, and all I find is ingredients.*" Its main purpose is to make it easy to keep an up-to-date overview of what you have in your pantry — and then use that information to show you what recipes you can make. Some people have the ability to look in the fridge and improvise — for everybody else, there is this app.
+
+There's a gazillion cooking apps on the market already. Most of them attempt to tie you to an ecosystem or website of some kind — "create your CookWorld.com user to favorite your recipes, oops we leaked your personal info", etc. This app has nothing like that. No ecosystem, no website, no user creation, etc. Instead, it's BYOB — Bring Your Own Backend. Pantryman stores the ingredients, pantry and recipes as simple text files (YAML for ingredients and pantry, Markdown with YAML frontmatter for recipes). You can put the data directory containing these wherever you want — a local folder, a flash drive, your own self-hosted Nextcloud, a server, Dropbox or your cloud provider of choice... Pantryman doesn't care. It just needs to be able to read it. Your data stays yours by design.
+
+---
+
+## Features (v0.1.0)
+
+- Browse, create, edit, and delete recipes (Markdown with YAML frontmatter)
+- Pantry management: track what you have in stock with quantities and units
+- Filter recipes by available ingredients
+- Ingredient library with categories and tags
+- Knowledge Base for culinary notes and technique articles
+- Folder picker to point the app at any local or cloud-synced directory
+- Light/dark/system theme
 
 ## Requirements
 
