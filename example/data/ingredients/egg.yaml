@@ -1,0 +1,10 @@
+name: egg
+slug: egg
+category: protein
+kb: null
+tags:
+- protein
+translations:
+  en:
+    one: egg
+    other: eggs

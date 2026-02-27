@@ -1,0 +1,29 @@
+[package]
+name = "pantryman-linux"
+version = "0.1.0"
+edition = "2021"
+description = "Pantryman Desktop — GTK4 frontend for Linux"
+repository = "https://github.com/yourname/pantryman-linux"
+
+[[bin]]
+name = "pantryman"
+path = "src/main.rs"
+
+[lib]
+name = "pantryman_linux"
+path = "src/lib.rs"
+
+[dependencies]
+janus-engine   = { path = "../janus-engine" }
+gtk4           = { version = "0.9", package = "gtk4" }
+libadwaita     = { version = "0.7", features = ["v1_4"] }
+relm4          = { version = "0.9.1", features = ["macros", "libadwaita"] }
+env_logger     = "0.11"
+log            = "0.4"
+serde          = { version = "1.0", features = ["derive"] }
+toml           = "0.8"
+dirs           = "5.0"
+chrono         = "0.4"
+
+[dev-dependencies]
+tempfile = "3"

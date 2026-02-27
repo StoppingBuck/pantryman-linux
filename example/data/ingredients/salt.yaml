@@ -1,0 +1,9 @@
+name: salt
+slug: salt
+category: spice
+kb: salt
+tags: []
+translations:
+  en:
+    one: salt
+    other: salt

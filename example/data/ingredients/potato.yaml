@@ -1,0 +1,11 @@
+name: potato
+slug: potato
+category: vegetable
+kb: potato
+tags:
+- vegetable
+- starch
+translations:
+  en:
+    one: potato
+    other: potatoes
