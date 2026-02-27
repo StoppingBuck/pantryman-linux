@@ -10,7 +10,7 @@ sudo pacman -S gtk4 libadwaita
 sudo apt install libgtk-4-dev libadwaita-1-dev
 
 # Clone engine as sibling
-git clone https://github.com/mpr/janus-engine ../janus-engine
+git clone https://github.com/StoppingBuck/janus-engine ../janus-engine
 
 # Compile
 ./dev.sh compile
