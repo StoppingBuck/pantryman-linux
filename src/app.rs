@@ -157,8 +157,9 @@ impl SimpleComponent for App {
         let (tx, rx) = mpsc::channel();
         let sender_startup = sender.clone();
         let data_dir_startup = data_dir.clone();
+        let device_id_startup = UserSettings::effective_device_id();
         std::thread::spawn(move || {
-            let result = DataManager::new(&data_dir_startup).map_err(|e| e.to_string());
+            let result = DataManager::new(&data_dir_startup, device_id_startup).map_err(|e| e.to_string());
             let _ = tx.send(result);
             sender_startup.input(AppMsg::DataDirReady(
                 data_dir_startup.display().to_string(),
@@ -484,8 +485,9 @@ impl SimpleComponent for App {
                 let (tx, rx) = mpsc::channel();
                 self.pending_dm = Some(rx);
                 let sender_clone = sender.clone();
+                let device_id_reload = UserSettings::effective_device_id();
                 std::thread::spawn(move || {
-                    let result = DataManager::new(&path).map_err(|e| e.to_string());
+                    let result = DataManager::new(&path, device_id_reload).map_err(|e| e.to_string());
                     let _ = tx.send(result);
                     sender_clone.input(AppMsg::DataDirReady(dir));
                 });
@@ -527,7 +529,7 @@ impl SimpleComponent for App {
                 // Actual toast shown in update_view
             }
             AppMsg::ReloadAll => {
-                if let Ok(new_dm) = DataManager::new(&self.data_dir) {
+                if let Ok(new_dm) = DataManager::new(&self.data_dir, UserSettings::effective_device_id()) {
                     self.dm = Some(Rc::new(RefCell::new(new_dm)));
                 }
                 self.recipes_dirty.set(true);

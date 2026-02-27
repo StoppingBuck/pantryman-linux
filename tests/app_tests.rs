@@ -6,7 +6,7 @@ mod tests {
     fn app_module_compiles() {
         // Smoke test: the module is accessible and core types are importable.
         let _: fn() = || {
-            let _ = std::mem::size_of::<cookbook_gtk::app::Tab>();
+            let _ = std::mem::size_of::<pantryman_linux::app::Tab>();
         };
     }
 }

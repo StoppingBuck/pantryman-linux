@@ -1,4 +1,4 @@
-use cookbook_gtk::ui_constants::*;
+use pantryman_linux::ui_constants::*;
 
 #[test]
 fn default_margin_is_positive() {

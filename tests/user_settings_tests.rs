@@ -1,5 +1,5 @@
 // Tests for the UserSettings / config module.
-use cookbook_gtk::config::{Theme, UserSettings};
+use pantryman_linux::config::{Theme, UserSettings};
 
 #[test]
 fn default_settings_are_system_theme() {

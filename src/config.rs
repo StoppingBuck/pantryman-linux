@@ -17,6 +17,10 @@ pub struct UserSettings {
     pub language: String,
     #[serde(default)]
     pub theme: Theme,
+    /// Stable per-device identifier used for per-device pantry files.
+    /// Generated once on first run and persisted.
+    #[serde(default)]
+    pub device_id: Option<String>,
 }
 
 fn default_language() -> String {
@@ -29,7 +33,46 @@ impl Default for UserSettings {
             data_dir: None,
             language: "en".to_string(),
             theme: Theme::default(),
+            device_id: None,
         }
+    }
+}
+
+impl UserSettings {
+    /// Returns this device's stable ID, generating and persisting one if needed.
+    pub fn effective_device_id() -> String {
+        let mut settings = Self::load();
+        if let Some(id) = &settings.device_id {
+            return id.clone();
+        }
+        let id = Self::generate_device_id();
+        settings.device_id = Some(id.clone());
+        settings.save();
+        id
+    }
+
+    /// Generates a random 8-character alphanumeric ID prefixed with "kde-".
+    /// Uses `/dev/urandom` on Linux with a timestamp fallback.
+    fn generate_device_id() -> String {
+        use std::io::Read;
+        const CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+        let mut bytes = [0u8; 8];
+        if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+            let _ = f.read_exact(&mut bytes);
+        } else {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .subsec_nanos();
+            for (i, b) in bytes.iter_mut().enumerate() {
+                *b = ((nanos >> (i * 4)) & 0xFF) as u8;
+            }
+        }
+        let mut id = String::from("kde-");
+        for b in &bytes {
+            id.push(CHARS[(*b as usize) % CHARS.len()] as char);
+        }
+        id
     }
 }
 
@@ -37,7 +80,7 @@ impl UserSettings {
     pub fn config_path() -> PathBuf {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("cookbook-gtk/user_settings.toml")
+            .join("pantryman/user_settings.toml")
     }
 
     pub fn load() -> Self {
@@ -94,6 +137,7 @@ mod tests {
             data_dir: Some("/tmp/test".to_string()),
             language: "de".to_string(),
             theme: Theme::Dark,
+            device_id: Some("kde-testabcd".to_string()),
         };
         let serialized = toml::to_string(&original).expect("serialize");
         let loaded: UserSettings = toml::from_str(&serialized).expect("deserialize");

@@ -262,6 +262,8 @@ pub fn show_recipe_dialog(
 
         let recipe = Recipe {
             title: title.trim().to_string(),
+            slug: String::new(),
+            file_stem: String::new(),
             ingredients,
             prep_time,
             downtime,
@@ -446,6 +448,7 @@ pub fn show_ingredient_dialog(
         let ingredient = Ingredient {
             name: name.clone(),
             slug: name.to_lowercase().replace(' ', "_"),
+            file_stem: String::new(),
             category,
             kb: None,
             tags,

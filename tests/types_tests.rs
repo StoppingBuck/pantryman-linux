@@ -1,5 +1,5 @@
 // Tests for app types (Tab, AppMsg).
-use cookbook_gtk::app::{AppMsg, Tab};
+use pantryman_linux::app::{AppMsg, Tab};
 
 #[test]
 fn tab_variants_are_distinct() {
