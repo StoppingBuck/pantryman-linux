@@ -1,6 +1,6 @@
 # Pantryman (Linux / GTK4)
 
-A GTK4 desktop app for managing your pantry and recipes. Built with [Relm4](https://relm4.org/) on top of [Janus Engine](https://github.com/mpr/janus-engine).
+A GTK4 desktop app for managing your pantry and recipes. Built with [Relm4](https://relm4.org/) on top of [Janus Engine](https://github.com/StoppingBuck/janus-engine).
 
 ## Features
 
@@ -31,7 +31,7 @@ sudo apt install libgtk-4-dev libadwaita-1-dev
 
 ```bash
 # Clone janus-engine as a sibling directory first
-git clone https://github.com/mpr/janus-engine ../janus-engine
+git clone https://github.com/StoppingBuck/janus-engine ../janus-engine
 
 # Build and run
 ./dev.sh run
@@ -57,7 +57,7 @@ By default, the app uses `example/data/` (pre-seeded with sample data). Point it
 1. The `PANTRYMAN_DATA_DIR` environment variable, or
 2. Settings → Data Directory in the app
 
-The data format is documented in [janus-engine](https://github.com/mpr/janus-engine).
+The data format is documented in [janus-engine](https://github.com/StoppingBuck/janus-engine).
 
 ## Architecture
 
