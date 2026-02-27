@@ -301,17 +301,6 @@ pub fn update_ingredient_detail(
         }
     }
 
-    // ── KB link ───────────────────────────────────────────────────────────────
-    if let Some(kb_slug) = &ing.kb {
-        if let Some(kb_entry) = dm.get_kb_entry(kb_slug) {
-            detail.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-            let kb_label = gtk::Label::new(Some(&format!("📖 {}", kb_entry.title)));
-            kb_label.set_halign(gtk::Align::Start);
-            kb_label.add_css_class("caption");
-            detail.append(&kb_label);
-        }
-    }
-
     detail.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
 
     // ── Action buttons ────────────────────────────────────────────────────────

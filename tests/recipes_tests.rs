@@ -3,10 +3,7 @@ use janus_engine::DataManager;
 use std::path::PathBuf;
 
 fn fixture_data_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .join("example/data")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("example/data")
 }
 
 #[test]

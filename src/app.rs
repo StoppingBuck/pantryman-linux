@@ -16,7 +16,6 @@ use std::sync::mpsc;
 pub enum Tab {
     Recipes,
     Pantry,
-    Kb,
     Settings,
 }
 
@@ -50,9 +49,6 @@ pub enum AppMsg {
         qty_type: String,
     },
 
-    // Knowledge Base
-    SelectKb(Option<String>),
-
     // Settings
     SetDataDir(String),
     DataDirReady(String),
@@ -82,16 +78,11 @@ pub struct App {
     pub category_filter: Vec<String>,
     pub in_stock_only: bool,
 
-    // KB state
-    pub selected_kb: Option<String>,
-
     // Dirty flags (Cell<bool> avoids &mut self in update_view)
     pub recipes_dirty: Cell<bool>,
     pub pantry_dirty: Cell<bool>,
-    pub kb_dirty: Cell<bool>,
     pub recipe_detail_dirty: Cell<bool>,
     pub ingredient_detail_dirty: Cell<bool>,
-    pub kb_detail_dirty: Cell<bool>,
 
     // Pending dialog requests (RefCell allows mutation from &self in update_view)
     pub pending_add_recipe: Cell<bool>,
@@ -120,9 +111,6 @@ pub struct AppWidgets {
     pub ingredient_detail: gtk::Box,
     pub in_stock_switch: gtk::Switch,
 
-    // KB
-    pub kb_list: gtk::ListBox,
-    pub kb_detail: gtk::Box,
 }
 
 // ── SimpleComponent impl ──────────────────────────────────────────────────────
@@ -177,13 +165,10 @@ impl SimpleComponent for App {
             selected_ingredient: None,
             category_filter: Vec::new(),
             in_stock_only: false,
-            selected_kb: None,
             recipes_dirty: Cell::new(true),
             pantry_dirty: Cell::new(true),
-            kb_dirty: Cell::new(true),
             recipe_detail_dirty: Cell::new(false),
             ingredient_detail_dirty: Cell::new(false),
-            kb_detail_dirty: Cell::new(false),
             pending_add_recipe: Cell::new(false),
             pending_edit_recipe: RefCell::new(None),
             pending_add_ingredient: Cell::new(false),
@@ -220,7 +205,6 @@ impl SimpleComponent for App {
         for (icon, label, tab_name) in &[
             ("emblem-documents-symbolic", "Recipes", "recipes"),
             ("view-list-symbolic", "Pantry", "pantry"),
-            ("system-help-symbolic", "Knowledge Base", "kb"),
             ("preferences-system-symbolic", "Settings", "settings"),
         ] {
             let row = gtk::ListBoxRow::new();
@@ -253,7 +237,6 @@ impl SimpleComponent for App {
                     let tab = match name.as_str() {
                         "recipes" => Tab::Recipes,
                         "pantry" => Tab::Pantry,
-                        "kb" => Tab::Kb,
                         "settings" => Tab::Settings,
                         _ => Tab::Recipes,
                     };
@@ -281,11 +264,6 @@ impl SimpleComponent for App {
             crate::pantry::build_pantry_tab(&None, false, sender.clone());
         main_stack.add_named(&pantry_widget, Some("pantry"));
 
-        // KB tab
-        let (kb_widget, kb_list, kb_detail) =
-            crate::kb::build_kb_tab(&None, sender.clone());
-        main_stack.add_named(&kb_widget, Some("kb"));
-
         // Settings tab
         let settings_widget = crate::settings::build_settings_page(&sender);
         main_stack.add_named(&settings_widget, Some("settings"));
@@ -310,8 +288,6 @@ impl SimpleComponent for App {
             pantry_list,
             ingredient_detail,
             in_stock_switch,
-            kb_list,
-            kb_detail,
         };
 
         ComponentParts {
@@ -465,12 +441,6 @@ impl SimpleComponent for App {
                 }
             }
 
-            // ── KB ────────────────────────────────────────────────────────────
-            AppMsg::SelectKb(slug) => {
-                self.selected_kb = slug;
-                self.kb_detail_dirty.set(true);
-            }
-
             // ── Settings ──────────────────────────────────────────────────────
             AppMsg::SetDataDir(dir) => {
                 let path = PathBuf::from(&dir);
@@ -506,10 +476,8 @@ impl SimpleComponent for App {
                 }
                 self.recipes_dirty.set(true);
                 self.pantry_dirty.set(true);
-                self.kb_dirty.set(true);
                 self.selected_recipe = None;
                 self.selected_ingredient = None;
-                self.selected_kb = None;
             }
             AppMsg::SetTheme(theme_str) => {
                 let theme = match theme_str.as_str() {
@@ -534,7 +502,6 @@ impl SimpleComponent for App {
                 }
                 self.recipes_dirty.set(true);
                 self.pantry_dirty.set(true);
-                self.kb_dirty.set(true);
             }
         }
     }
@@ -546,7 +513,6 @@ impl SimpleComponent for App {
         let tab_name = match self.tab {
             Tab::Recipes => "recipes",
             Tab::Pantry => "pantry",
-            Tab::Kb => "kb",
             Tab::Settings => "settings",
         };
         widgets.main_stack.set_visible_child_name(tab_name);
@@ -614,22 +580,6 @@ impl SimpleComponent for App {
                 crate::pantry::show_ingredient_placeholder(&widgets.ingredient_detail);
             }
             self.ingredient_detail_dirty.set(false);
-        }
-
-        // KB list rebuild
-        if self.kb_dirty.get() {
-            crate::kb::populate_kb_list(&widgets.kb_list, &self.dm, &sender);
-            self.kb_dirty.set(false);
-        }
-
-        // KB detail
-        if self.kb_detail_dirty.get() || self.tab == Tab::Kb {
-            if let Some(ref slug) = self.selected_kb {
-                crate::kb::update_kb_detail(&widgets.kb_detail, &self.dm, slug);
-            } else {
-                crate::kb::show_kb_placeholder(&widgets.kb_detail);
-            }
-            self.kb_detail_dirty.set(false);
         }
 
         // ── Open pending dialogs (need widget references for parent window) ───

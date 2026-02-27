@@ -4,8 +4,7 @@ use pantryman_linux::app::{AppMsg, Tab};
 #[test]
 fn tab_variants_are_distinct() {
     assert_ne!(Tab::Recipes, Tab::Pantry);
-    assert_ne!(Tab::Pantry, Tab::Kb);
-    assert_ne!(Tab::Kb, Tab::Settings);
+    assert_ne!(Tab::Pantry, Tab::Settings);
 }
 
 #[test]

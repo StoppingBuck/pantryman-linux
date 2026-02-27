@@ -450,7 +450,6 @@ pub fn show_ingredient_dialog(
             slug: name.to_lowercase().replace(' ', "_"),
             file_stem: String::new(),
             category,
-            kb: None,
             tags,
             translations: None,
         };
