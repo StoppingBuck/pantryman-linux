@@ -1,5 +1,6 @@
 /// Recipes tab: recipe list with availability indicators and detail view.
 use crate::app::{App, AppMsg};
+use crate::i18n;
 use crate::ui_constants::*;
 use janus_engine::DataManager;
 use libadwaita as adw;
@@ -15,6 +16,8 @@ pub fn build_recipes_tab(
     dm: &Option<Rc<RefCell<DataManager>>>,
     sender: ComponentSender<App>,
 ) -> (gtk::Widget, gtk::ListBox, gtk::Box) {
+    let s = i18n::strings();
+
     let paned = gtk::Paned::new(gtk::Orientation::Horizontal);
     paned.set_hexpand(true);
     paned.set_vexpand(true);
@@ -25,7 +28,7 @@ pub fn build_recipes_tab(
     left.set_width_request(200);
 
     let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some("Search recipes…"));
+    search.set_placeholder_text(Some(s.search_recipes));
     search.set_margin_top(DEFAULT_MARGIN);
     search.set_margin_bottom(DEFAULT_MARGIN);
     search.set_margin_start(DEFAULT_MARGIN);
@@ -45,7 +48,7 @@ pub fn build_recipes_tab(
     left.append(&list_scroll);
 
     // Add recipe button
-    let add_btn = gtk::Button::with_label("Add Recipe");
+    let add_btn = gtk::Button::with_label(s.add_recipe);
     add_btn.add_css_class("flat");
     add_btn.set_margin_all(DEFAULT_MARGIN);
     {
@@ -102,10 +105,11 @@ pub fn populate_recipe_list(
     search: &str,
     _sender: &ComponentSender<App>,
 ) {
+    let s = i18n::strings();
     crate::utils::clear_list_box(list);
 
     let Some(dm) = dm else {
-        list.append(&empty_state_row("No data directory set"));
+        list.append(&empty_state_row(s.no_data_dir));
         return;
     };
 
@@ -119,20 +123,20 @@ pub fn populate_recipe_list(
     };
 
     if recipes.is_empty() {
-        list.append(&empty_state_row("No recipes found"));
+        list.append(&empty_state_row(s.no_recipes_found));
         return;
     }
 
     for recipe in recipes {
-        let all_in_stock = recipe.all_ingredients_in_stock(&dm);
-        let row = build_recipe_row(recipe, all_in_stock);
+        let cov = recipe.pantry_coverage(&dm);
+        let row = build_recipe_row(recipe, cov);
         list.append(&row);
     }
 }
 
 fn build_recipe_row(
     recipe: &janus_engine::Recipe,
-    all_in_stock: bool,
+    cov: janus_engine::PantryCoverage,
 ) -> gtk::ListBoxRow {
     let row = gtk::ListBoxRow::new();
     row.set_widget_name(&recipe.title);
@@ -143,16 +147,10 @@ fn build_recipe_row(
     hbox.set_margin_start(DEFAULT_MARGIN);
     hbox.set_margin_end(DEFAULT_MARGIN);
 
-    // Availability indicator
-    let dot = gtk::Label::new(Some(if all_in_stock { "●" } else { "○" }));
-    if all_in_stock {
-        dot.add_css_class("success");
-        dot.set_tooltip_text(Some("All ingredients available"));
-    } else {
-        dot.add_css_class("dim-label");
-        dot.set_tooltip_text(Some("Some ingredients missing from pantry"));
-    }
-    hbox.append(&dot);
+    // Pie-chart availability indicator
+    let tooltip = i18n::fmt_required_tooltip(cov.required_in_stock, cov.required_total);
+    let pie = crate::utils::build_coverage_pie(cov.required_ratio(), &tooltip);
+    hbox.append(&pie);
 
     let title_label = gtk::Label::new(Some(&recipe.title));
     title_label.set_hexpand(true);
@@ -171,6 +169,7 @@ pub fn update_recipe_detail(
     title: &str,
     sender: &ComponentSender<App>,
 ) {
+    let s = i18n::strings();
     crate::utils::clear_box(detail);
 
     let Some(dm_rc) = dm else {
@@ -199,7 +198,7 @@ pub fn update_recipe_detail(
     let btn_box = gtk::Box::new(gtk::Orientation::Horizontal, ROW_SPACING);
     btn_box.set_valign(gtk::Align::Start);
 
-    let edit_btn = gtk::Button::with_label("Edit");
+    let edit_btn = gtk::Button::with_label(s.edit);
     edit_btn.add_css_class("flat");
     {
         let sender_edit = sender.clone();
@@ -209,7 +208,7 @@ pub fn update_recipe_detail(
         });
     }
 
-    let delete_btn = gtk::Button::with_label("Delete");
+    let delete_btn = gtk::Button::with_label(s.delete);
     delete_btn.add_css_class("flat");
     delete_btn.add_css_class("destructive-action");
     {
@@ -232,19 +231,19 @@ pub fn update_recipe_detail(
 
     let mut has_meta = false;
     if let Some(prep) = recipe.prep_time {
-        let label = gtk::Label::new(Some(&format!("⏱ {} min prep", prep)));
+        let label = gtk::Label::new(Some(&i18n::fmt_prep_time(prep)));
         label.add_css_class("caption");
         meta_box.append(&label);
         has_meta = true;
     }
     if let Some(down) = recipe.downtime {
-        let label = gtk::Label::new(Some(&format!("🔥 {} min", down)));
+        let label = gtk::Label::new(Some(&i18n::fmt_cook_time(down)));
         label.add_css_class("caption");
         meta_box.append(&label);
         has_meta = true;
     }
     if let Some(servings) = recipe.servings {
-        let label = gtk::Label::new(Some(&format!("👤 {} servings", servings)));
+        let label = gtk::Label::new(Some(&i18n::fmt_servings(servings)));
         label.add_css_class("caption");
         meta_box.append(&label);
         has_meta = true;
@@ -256,7 +255,7 @@ pub fn update_recipe_detail(
     // Tags
     if let Some(tags) = &recipe.tags {
         if !tags.is_empty() {
-            let tags_label = gtk::Label::new(Some(&format!("Tags: {}", tags.join(", "))));
+            let tags_label = gtk::Label::new(Some(&i18n::fmt_tags(&tags.join(", "))));
             tags_label.add_css_class("caption");
             tags_label.add_css_class("dim-label");
             tags_label.set_halign(gtk::Align::Start);
@@ -267,38 +266,57 @@ pub fn update_recipe_detail(
     detail.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
 
     // ── Ingredients ───────────────────────────────────────────────────────────
-    let ing_header = gtk::Label::new(Some("Ingredients"));
+    let ing_header = gtk::Label::new(Some(s.ingredients_heading));
     ing_header.add_css_class("heading");
     ing_header.set_halign(gtk::Align::Start);
     detail.append(&ing_header);
 
-    let all_in_stock = recipe.all_ingredients_in_stock(&dm);
-    if all_in_stock {
-        let ready_label = gtk::Label::new(Some("● All ingredients available — ready to cook!"));
-        ready_label.add_css_class("success");
-        ready_label.set_halign(gtk::Align::Start);
-        detail.append(&ready_label);
-    }
+    let cov = recipe.pantry_coverage(&dm);
+    let status_label = if cov.is_cookable() {
+        let lbl = gtk::Label::new(Some(s.all_required_available));
+        lbl.add_css_class("success");
+        lbl
+    } else {
+        let missing = cov.required_total - cov.required_in_stock;
+        let lbl = gtk::Label::new(Some(&i18n::fmt_missing_required(missing)));
+        lbl.add_css_class("dim-label");
+        lbl
+    };
+    status_label.set_halign(gtk::Align::Start);
+    detail.append(&status_label);
 
     for ing in &recipe.ingredients {
         let in_pantry = dm.is_in_pantry(&ing.ingredient);
         let row = gtk::Box::new(gtk::Orientation::Horizontal, ROW_SPACING);
         row.set_margin_start(DEFAULT_MARGIN);
 
-        let dot = gtk::Label::new(Some(if in_pantry { "●" } else { "○" }));
-        if in_pantry {
-            dot.add_css_class("success");
+        let dot = if in_pantry {
+            let d = gtk::Label::new(Some("●"));
+            d.add_css_class("success");
+            d
+        } else if ing.optional {
+            let d = gtk::Label::new(Some("○"));
+            d.add_css_class("dim-label");
+            d
         } else {
-            dot.add_css_class("error");
-        }
+            let d = gtk::Label::new(Some("○"));
+            d.add_css_class("error");
+            d
+        };
         row.append(&dot);
 
-        let display_name = dm.recipe_ingredient_display_name(ing, "en");
-        let qty_str = match (ing.quantity, &ing.quantity_type) {
+        let display_name = dm.recipe_ingredient_display_name(ing);
+        let mut qty_str = match (&ing.quantity, &ing.quantity_type) {
             (Some(q), Some(u)) if !u.is_empty() => format!("{} {} {}", q, u, display_name),
             (Some(q), _) => format!("{} {}", q, display_name),
             _ => display_name,
         };
+        if let Some(note) = &ing.note {
+            qty_str = format!("{} ({})", qty_str, note);
+        }
+        if ing.optional {
+            qty_str = format!("{}{}", qty_str, s.optional_suffix);
+        }
         let label = gtk::Label::new(Some(&qty_str));
         label.set_halign(gtk::Align::Start);
         if !in_pantry {
@@ -313,7 +331,7 @@ pub fn update_recipe_detail(
     if !recipe.instructions.is_empty() {
         detail.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
 
-        let instr_header = gtk::Label::new(Some("Instructions"));
+        let instr_header = gtk::Label::new(Some(s.instructions_heading));
         instr_header.add_css_class("heading");
         instr_header.set_halign(gtk::Align::Start);
         detail.append(&instr_header);
@@ -334,14 +352,15 @@ fn show_delete_recipe_confirm(
     sender: &ComponentSender<App>,
 ) {
     use adw::prelude::*;
+    let s = i18n::strings();
 
     let dialog = adw::MessageDialog::new(
         parent,
-        Some(&format!("Delete \"{}\"?", title)),
-        Some("This recipe will be permanently removed. This cannot be undone."),
+        Some(&i18n::fmt_delete_recipe_title(title)),
+        Some(s.delete_recipe_body),
     );
-    dialog.add_response("cancel", "Cancel");
-    dialog.add_response("delete", "Delete");
+    dialog.add_response("cancel", s.cancel);
+    dialog.add_response("delete", s.delete);
     dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
     dialog.set_default_response(Some("cancel"));
     dialog.set_close_response("cancel");
@@ -357,13 +376,12 @@ fn show_delete_recipe_confirm(
 }
 
 pub fn show_recipe_placeholder(detail: &gtk::Box) {
+    let s = i18n::strings();
     crate::utils::clear_box(detail);
     let status = adw::StatusPage::new();
     status.set_icon_name(Some("emblem-documents-symbolic"));
-    status.set_title("Recipes");
-    status.set_description(Some(
-        "Select a recipe to view it, or add a new one.\n● = all ingredients in pantry",
-    ));
+    status.set_title(s.recipe_placeholder_title);
+    status.set_description(Some(s.recipe_placeholder_desc));
     status.set_vexpand(true);
     detail.append(&status);
 }

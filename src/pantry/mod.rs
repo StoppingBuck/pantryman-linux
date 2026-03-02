@@ -1,5 +1,6 @@
 /// Pantry tab: ingredient list with in-stock toggle and detail view.
 use crate::app::{App, AppMsg};
+use crate::i18n;
 use crate::ui_constants::*;
 use janus_engine::DataManager;
 use libadwaita as adw;
@@ -16,6 +17,8 @@ pub fn build_pantry_tab(
     in_stock_only: bool,
     sender: ComponentSender<App>,
 ) -> (gtk::Widget, gtk::ListBox, gtk::Box, gtk::Switch) {
+    let s = i18n::strings();
+
     let paned = gtk::Paned::new(gtk::Orientation::Horizontal);
     paned.set_hexpand(true);
     paned.set_vexpand(true);
@@ -27,7 +30,7 @@ pub fn build_pantry_tab(
 
     // Search bar
     let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some("Search ingredients…"));
+    search.set_placeholder_text(Some(s.search_pantry));
     search.set_margin_top(DEFAULT_MARGIN);
     search.set_margin_bottom(ROW_SPACING);
     search.set_margin_start(DEFAULT_MARGIN);
@@ -40,7 +43,7 @@ pub fn build_pantry_tab(
     filter_box.set_margin_end(DEFAULT_MARGIN);
     filter_box.set_margin_bottom(ROW_SPACING);
 
-    let in_stock_label = gtk::Label::new(Some("In stock only"));
+    let in_stock_label = gtk::Label::new(Some(s.in_stock_only_label));
     in_stock_label.set_hexpand(true);
     in_stock_label.set_halign(gtk::Align::Start);
 
@@ -66,7 +69,7 @@ pub fn build_pantry_tab(
     left.append(&list_scroll);
 
     // Add ingredient button
-    let add_btn = gtk::Button::with_label("Add Ingredient");
+    let add_btn = gtk::Button::with_label(s.add_ingredient_btn);
     add_btn.add_css_class("flat");
     add_btn.set_margin_all(DEFAULT_MARGIN);
     {
@@ -114,7 +117,7 @@ pub fn build_pantry_tab(
         pantry_list.connect_row_selected(move |_, row| {
             if let Some(row) = row {
                 let name = row.widget_name().to_string();
-                if !name.is_empty() && name != "__empty__" {
+                if !name.is_empty() && name != "__empty__" && name != "__header__" {
                     sender_select.input(AppMsg::SelectIngredient(Some(name)));
                 }
             }
@@ -133,23 +136,35 @@ pub fn populate_pantry_list(
     in_stock_only: bool,
     _sender: &ComponentSender<App>,
 ) {
+    let s = i18n::strings();
     crate::utils::clear_list_box(list);
 
     let Some(dm) = dm else {
-        list.append(&empty_state_row("No data directory set"));
+        list.append(&empty_state_row(s.no_data_dir));
         return;
     };
 
     let dm = dm.borrow();
-    let mut ingredients = dm.filter_ingredients(search, categories, in_stock_only, "en");
-    ingredients.sort_by(|a, b| a.name.cmp(&b.name));
+    let mut ingredients = dm.filter_ingredients(search, categories, in_stock_only);
+    // Sort by (category, name), empty category sorts last via sentinel
+    ingredients.sort_by(|a, b| {
+        let ca = if a.category.is_empty() { "\u{FFFF}" } else { a.category.as_str() };
+        let cb = if b.category.is_empty() { "\u{FFFF}" } else { b.category.as_str() };
+        ca.cmp(cb).then_with(|| a.name.cmp(&b.name))
+    });
 
     if ingredients.is_empty() {
-        list.append(&empty_state_row("No ingredients found"));
+        list.append(&empty_state_row(s.no_ingredients_found));
         return;
     }
 
-    for ing in ingredients {
+    let mut current_category: Option<String> = None;
+    for ing in &ingredients {
+        let cat = if ing.category.is_empty() { s.uncategorised } else { ing.category.as_str() };
+        if current_category.as_deref() != Some(cat) {
+            list.append(&build_category_header_row(cat));
+            current_category = Some(cat.to_string());
+        }
         let in_pantry = dm.is_in_pantry(&ing.name);
         let row = build_ingredient_row(ing, in_pantry);
         list.append(&row);
@@ -184,13 +199,24 @@ fn build_ingredient_row(
     name_label.set_halign(gtk::Align::Start);
     hbox.append(&name_label);
 
-    // Category badge
-    let cat_label = gtk::Label::new(Some(&ing.category));
-    cat_label.add_css_class("dim-label");
-    cat_label.add_css_class("caption");
-    hbox.append(&cat_label);
-
     row.set_child(Some(&hbox));
+    row
+}
+
+fn build_category_header_row(category: &str) -> gtk::ListBoxRow {
+    let row = gtk::ListBoxRow::new();
+    row.set_widget_name("__header__");
+    row.set_activatable(false);
+    row.set_selectable(false);
+
+    let label = gtk::Label::new(Some(category));
+    label.add_css_class("heading");
+    label.set_halign(gtk::Align::Start);
+    label.set_margin_top(DEFAULT_MARGIN);
+    label.set_margin_bottom(ROW_SPACING);
+    label.set_margin_start(DEFAULT_MARGIN);
+    label.set_margin_end(DEFAULT_MARGIN);
+    row.set_child(Some(&label));
     row
 }
 
@@ -201,6 +227,7 @@ pub fn update_ingredient_detail(
     name: &str,
     sender: &ComponentSender<App>,
 ) {
+    let s = i18n::strings();
     crate::utils::clear_box(detail);
 
     let Some(dm_rc) = dm else {
@@ -221,17 +248,19 @@ pub fn update_ingredient_detail(
     title.set_wrap(true);
     detail.append(&title);
 
-    // Category
-    let cat = gtk::Label::new(Some(&format!("Category: {}", ing.category)));
-    cat.add_css_class("caption");
-    cat.add_css_class("dim-label");
-    cat.set_halign(gtk::Align::Start);
-    detail.append(&cat);
+    // Category (omit if empty)
+    if !ing.category.is_empty() {
+        let cat = gtk::Label::new(Some(&i18n::fmt_category(&ing.category)));
+        cat.add_css_class("caption");
+        cat.add_css_class("dim-label");
+        cat.set_halign(gtk::Align::Start);
+        detail.append(&cat);
+    }
 
     // Tags
     if let Some(tags) = &ing.tags {
         if !tags.is_empty() {
-            let tags_label = gtk::Label::new(Some(&format!("Tags: {}", tags.join(", "))));
+            let tags_label = gtk::Label::new(Some(&i18n::fmt_tags(&tags.join(", "))));
             tags_label.add_css_class("caption");
             tags_label.set_halign(gtk::Align::Start);
             detail.append(&tags_label);
@@ -241,35 +270,30 @@ pub fn update_ingredient_detail(
     detail.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
 
     // ── Pantry status ─────────────────────────────────────────────────────────
-    let pantry_header = gtk::Label::new(Some("Pantry"));
+    let pantry_header = gtk::Label::new(Some(s.pantry_heading));
     pantry_header.add_css_class("heading");
     pantry_header.set_halign(gtk::Align::Start);
     detail.append(&pantry_header);
 
     if let Some(item) = dm.get_pantry_item(name) {
-        let status = gtk::Label::new(Some("✓ In stock"));
+        let status = gtk::Label::new(Some(s.in_stock_status));
         status.add_css_class("success");
         status.set_halign(gtk::Align::Start);
         detail.append(&status);
 
         if let Some(qty) = item.quantity {
-            let qty_text = if item.quantity_type.is_empty() {
-                format!("Quantity: {}", qty)
-            } else {
-                format!("Quantity: {} {}", qty, item.quantity_type)
-            };
-            let qty_label = gtk::Label::new(Some(&qty_text));
+            let qty_label = gtk::Label::new(Some(&i18n::fmt_quantity(qty, &item.quantity_type)));
             qty_label.set_halign(gtk::Align::Start);
             detail.append(&qty_label);
         }
 
-        let updated = gtk::Label::new(Some(&format!("Last updated: {}", item.last_updated)));
+        let updated = gtk::Label::new(Some(&i18n::fmt_last_updated(&item.last_updated)));
         updated.add_css_class("caption");
         updated.add_css_class("dim-label");
         updated.set_halign(gtk::Align::Start);
         detail.append(&updated);
     } else {
-        let status = gtk::Label::new(Some("✗ Not in stock"));
+        let status = gtk::Label::new(Some(s.not_in_stock_status));
         status.add_css_class("error");
         status.set_halign(gtk::Align::Start);
         detail.append(&status);
@@ -279,21 +303,17 @@ pub fn update_ingredient_detail(
     let recipes = dm.get_recipes_with_ingredient(name);
     if !recipes.is_empty() {
         detail.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-        let recipes_header = gtk::Label::new(Some("Used in recipes"));
+        let recipes_header = gtk::Label::new(Some(s.used_in_recipes));
         recipes_header.add_css_class("heading");
         recipes_header.set_halign(gtk::Align::Start);
         detail.append(&recipes_header);
 
         for recipe in &recipes {
-            let all_in = recipe.all_ingredients_in_stock(&dm);
+            let cov = recipe.pantry_coverage(&dm);
+            let tooltip = i18n::fmt_required_tooltip(cov.required_in_stock, cov.required_total);
             let recipe_row = gtk::Box::new(gtk::Orientation::Horizontal, ROW_SPACING);
-            let dot = gtk::Label::new(Some(if all_in { "●" } else { "○" }));
-            if all_in {
-                dot.add_css_class("success");
-            } else {
-                dot.add_css_class("dim-label");
-            }
-            recipe_row.append(&dot);
+            let pie = crate::utils::build_coverage_pie(cov.required_ratio(), &tooltip);
+            recipe_row.append(&pie);
             let recipe_label = gtk::Label::new(Some(&recipe.title));
             recipe_label.set_halign(gtk::Align::Start);
             recipe_row.append(&recipe_label);
@@ -307,7 +327,7 @@ pub fn update_ingredient_detail(
     let btn_box = gtk::Box::new(gtk::Orientation::Horizontal, ROW_SPACING);
     btn_box.set_halign(gtk::Align::End);
 
-    let edit_btn = gtk::Button::with_label("Edit");
+    let edit_btn = gtk::Button::with_label(s.edit);
     edit_btn.add_css_class("flat");
     {
         let sender_edit = sender.clone();
@@ -317,7 +337,7 @@ pub fn update_ingredient_detail(
         });
     }
 
-    let delete_btn = gtk::Button::with_label("Delete");
+    let delete_btn = gtk::Button::with_label(s.delete);
     delete_btn.add_css_class("flat");
     delete_btn.add_css_class("destructive-action");
     {
@@ -340,14 +360,15 @@ fn show_delete_ingredient_confirm(
     sender: &ComponentSender<App>,
 ) {
     use adw::prelude::*;
+    let s = i18n::strings();
 
     let dialog = adw::MessageDialog::new(
         parent,
-        Some(&format!("Delete \"{}\"?", name)),
-        Some("This will remove the ingredient and its pantry entry. This cannot be undone."),
+        Some(&i18n::fmt_delete_ingredient_title(name)),
+        Some(s.delete_ingredient_body),
     );
-    dialog.add_response("cancel", "Cancel");
-    dialog.add_response("delete", "Delete");
+    dialog.add_response("cancel", s.cancel);
+    dialog.add_response("delete", s.delete);
     dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
     dialog.set_default_response(Some("cancel"));
     dialog.set_close_response("cancel");
@@ -363,13 +384,12 @@ fn show_delete_ingredient_confirm(
 }
 
 pub fn show_ingredient_placeholder(detail: &gtk::Box) {
+    let s = i18n::strings();
     crate::utils::clear_box(detail);
     let status = adw::StatusPage::new();
     status.set_icon_name(Some("view-list-symbolic"));
-    status.set_title("Pantry");
-    status.set_description(Some(
-        "Select an ingredient to view details, or add a new one.",
-    ));
+    status.set_title(s.ingredient_placeholder_title);
+    status.set_description(Some(s.ingredient_placeholder_desc));
     status.set_vexpand(true);
     detail.append(&status);
 }

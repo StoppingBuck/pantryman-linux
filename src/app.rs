@@ -1,7 +1,8 @@
 /// Main application component: AppModel (state), AppMsg (messages), AppWidgets (UI references).
 use crate::config::{Theme, UserSettings};
 use crate::ui_constants::*;
-use janus_engine::{DataManager, Ingredient, Recipe};
+use crate::dialogs::IngredientInfo;
+use janus_engine::{fold_for_matching, DataManager, Ingredient, Recipe};
 use libadwaita as adw;
 use relm4::gtk;
 use relm4::{gtk::prelude::*, ComponentParts, ComponentSender, SimpleComponent};
@@ -53,6 +54,7 @@ pub enum AppMsg {
     SetDataDir(String),
     DataDirReady(String),
     SetTheme(String),
+    SetLanguage(String),
 
     // System
     ShowToast(String),
@@ -138,6 +140,7 @@ impl SimpleComponent for App {
         use adw::prelude::*;
 
         let settings = UserSettings::load();
+        crate::i18n::set_language(crate::i18n::Language::from_tag(&settings.language));
         let data_dir = UserSettings::effective_data_dir();
 
         // Load DataManager on a background thread so the window appears immediately
@@ -490,6 +493,18 @@ impl SimpleComponent for App {
                 s.theme = theme;
                 s.save();
             }
+            AppMsg::SetLanguage(tag) => {
+                let lang = crate::i18n::Language::from_tag(&tag);
+                crate::i18n::set_language(lang);
+                let mut s = self.settings.borrow_mut();
+                s.language = tag;
+                s.save();
+                // Rebuild data-driven views with new language
+                self.recipes_dirty.set(true);
+                self.pantry_dirty.set(true);
+                self.recipe_detail_dirty.set(true);
+                self.ingredient_detail_dirty.set(true);
+            }
 
             // ── System ────────────────────────────────────────────────────────
             AppMsg::ShowToast(msg) => {
@@ -629,18 +644,34 @@ pub fn apply_theme(theme: &Theme) {
 // (These live here rather than in update() because they need widget references
 // to find the parent window.)
 
-pub fn open_add_recipe_dialog(window: &adw::ApplicationWindow, dm: &Option<Rc<RefCell<DataManager>>>, sender: ComponentSender<App>) {
-    let names = dm
-        .as_ref()
-        .map(|d| {
-            d.borrow()
-                .get_all_ingredients()
-                .into_iter()
-                .map(|i| i.name.clone())
-                .collect()
+fn build_ingredient_infos(dm: &DataManager) -> Vec<IngredientInfo> {
+    dm.get_all_ingredients()
+        .into_iter()
+        .map(|ing| {
+            let mut forms: Vec<String> = vec![
+                fold_for_matching(&ing.name),
+                fold_for_matching(&ing.slug),
+            ];
+            if let Some(plural) = &ing.plural {
+                forms.push(fold_for_matching(plural));
+            }
+            forms.dedup();
+            let in_pantry = dm.is_in_pantry(&ing.name);
+            IngredientInfo {
+                name: ing.name.clone(),
+                forms,
+                in_pantry,
+            }
         })
+        .collect()
+}
+
+pub fn open_add_recipe_dialog(window: &adw::ApplicationWindow, dm: &Option<Rc<RefCell<DataManager>>>, sender: ComponentSender<App>) {
+    let infos = dm
+        .as_ref()
+        .map(|d| build_ingredient_infos(&d.borrow()))
         .unwrap_or_default();
-    crate::dialogs::show_recipe_dialog(window, names, None, sender);
+    crate::dialogs::show_recipe_dialog(window, infos, None, sender);
 }
 
 pub fn open_edit_recipe_dialog(
@@ -657,17 +688,11 @@ pub fn open_edit_recipe_dialog(
         None
     };
     if let Some(ref recipe) = recipe {
-        let names = dm
+        let infos = dm
             .as_ref()
-            .map(|d| {
-                d.borrow()
-                    .get_all_ingredients()
-                    .into_iter()
-                    .map(|i| i.name.clone())
-                    .collect()
-            })
+            .map(|d| build_ingredient_infos(&d.borrow()))
             .unwrap_or_default();
-        crate::dialogs::show_recipe_dialog(window, names, Some(recipe), sender);
+        crate::dialogs::show_recipe_dialog(window, infos, Some(recipe), sender);
     }
 }
 

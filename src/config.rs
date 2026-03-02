@@ -24,14 +24,14 @@ pub struct UserSettings {
 }
 
 fn default_language() -> String {
-    "en".to_string()
+    "system".to_string()
 }
 
 impl Default for UserSettings {
     fn default() -> Self {
         UserSettings {
             data_dir: None,
-            language: "en".to_string(),
+            language: "system".to_string(),
             theme: Theme::default(),
             device_id: None,
         }
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_default_settings() {
         let s = UserSettings::default();
-        assert_eq!(s.language, "en");
+        assert_eq!(s.language, "system");
         assert_eq!(s.theme, Theme::System);
         assert!(s.data_dir.is_none());
     }

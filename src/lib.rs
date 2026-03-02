@@ -1,6 +1,7 @@
 pub mod app;
 pub mod config;
 pub mod dialogs;
+pub mod i18n;
 pub mod pantry;
 pub mod recipes;
 pub mod settings;
